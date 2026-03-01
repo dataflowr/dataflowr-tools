@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "dataflowr"
 version = "0.1.0"
-description = "CLI and API for the Deep Learning DIY course (dataflowr.github.io)"
+description = "CLI, REST API, and MCP server for the Deep Learning DIY course (dataflowr.github.io)"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [
@@ -45,7 +45,7 @@ dataflowr = "dataflowr.cli:main"
 
 [project.urls]
 Homepage = "https://dataflowr.github.io/website"
-Repository = "https://github.com/dataflowr/notebooks"
+Repository = "https://github.com/dataflowr/dataflowr-tools"
 Documentation = "https://dataflowr.github.io/website"
 
 [tool.hatch.build.targets.wheel]

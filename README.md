@@ -3,9 +3,45 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](https://pypi.org/project/dataflowr/)
 
-Python package exposing the [Deep Learning DIY](https://dataflowr.github.io/website) course as a CLI, REST API, and MCP server.
+The [Deep Learning DIY](https://dataflowr.github.io/website) course teaches PyTorch from scratch — tensors, autodiff, CNNs, RNNs, Transformers, VAEs, and diffusion models — through hands-on notebooks. Course resources:
+
+- [dataflowr/notebooks](https://github.com/dataflowr/notebooks) — all practical notebooks (PyTorch fundamentals → diffusion models)
+- [dataflowr/gpu_llm_flash-attention](https://github.com/dataflowr/gpu_llm_flash-attention) — implement FlashAttention-2 from scratch using Triton
+- [dataflowr/llm_controlled-generation](https://github.com/dataflowr/llm_controlled-generation) — structured generation, meta-generation, and self-correction for LLMs
+
+This package exposes the course as a CLI, REST API, and MCP server so AI agents can navigate and teach it.
 
 ![Demo](demo.gif)
+
+## Quick start with Claude Code
+
+Add a `.mcp.json` file at the root of your project (homework repo, notebook folder, etc.):
+
+```json
+{
+  "mcpServers": {
+    "dataflowr": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--with", "dataflowr[mcp]", "python", "-m", "dataflowr.mcp_server"]
+    }
+  }
+}
+```
+
+Claude Code picks this up automatically when you open the folder. No global install needed — `uv` downloads `dataflowr[mcp]` on first use.
+
+To pre-approve all dataflowr tools (no per-call prompts), also add `.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": ["mcp__dataflowr"]
+  }
+}
+```
+
+---
 
 ## Install
 
@@ -148,6 +184,40 @@ python -m dataflowr.mcp_server --http
 
 ### Client configuration
 
+#### Claude Code (VSCode extension or CLI)
+
+Add a `.mcp.json` file at the **root of your project** (homework repo, notebook folder, etc.):
+
+```json
+{
+  "mcpServers": {
+    "dataflowr": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--with", "dataflowr[mcp]", "python", "-m", "dataflowr.mcp_server"]
+    }
+  }
+}
+```
+
+Claude Code picks this up automatically when you open the folder. No global install needed — `uv` downloads `dataflowr[mcp]` on first use.
+
+To pre-approve all dataflowr tools (no per-call prompts), also add `.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": ["mcp__dataflowr"]
+  }
+}
+```
+
+Or register globally (available in every project):
+
+```bash
+claude mcp add --scope user dataflowr -- uv run --with dataflowr[mcp] python -m dataflowr.mcp_server
+```
+
 #### Claude Desktop
 
 Edit `~/.claude/claude_desktop_config.json` (macOS/Linux) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
@@ -204,40 +274,6 @@ Edit `.vscode/mcp.json` at the root of your project:
     }
   }
 }
-```
-
-#### Claude Code (VSCode extension or CLI)
-
-Add a `.mcp.json` file at the **root of your project** (homework repo, notebook folder, etc.):
-
-```json
-{
-  "mcpServers": {
-    "dataflowr": {
-      "type": "stdio",
-      "command": "uv",
-      "args": ["run", "--with", "dataflowr[mcp]", "python", "-m", "dataflowr.mcp_server"]
-    }
-  }
-}
-```
-
-Claude Code picks this up automatically when you open the folder. No global install needed — `uv` downloads `dataflowr[mcp]` on first use.
-
-To pre-approve all dataflowr tools (no per-call prompts), also add `.claude/settings.json`:
-
-```json
-{
-  "permissions": {
-    "allow": ["mcp__dataflowr"]
-  }
-}
-```
-
-Or register globally (available in every project):
-
-```bash
-claude mcp add --scope user dataflowr -- uv run --with dataflowr[mcp] python -m dataflowr.mcp_server
 ```
 
 #### Remote / HTTP
