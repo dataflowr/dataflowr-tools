@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "dataflowr": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "-m",
+        "dataflowr.mcp_server"
+      ]
+    }
+  }
