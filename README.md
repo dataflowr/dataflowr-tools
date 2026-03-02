@@ -1,4 +1,4 @@
-# dataflowr
+# dataflowr — CLI, API & MCP server for the Deep Learning DIY course
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](https://pypi.org/project/dataflowr/)

@@ -2,14 +2,38 @@
 Fetch actual course content from GitHub (notebooks) and the dataflowr/website repo.
 
 All functions use only stdlib — no new dependencies.
+
+Local clone support
+-------------------
+Set environment variables to serve content from local git clones instead of
+fetching from GitHub. This eliminates GitHub API rate limits and enables
+offline use. Any subset of repos can be cloned; missing ones fall back to
+the network automatically.
+
+    DATAFLOWR_WEBSITE_PATH   → path to cloned dataflowr/website
+    DATAFLOWR_SLIDES_PATH    → path to cloned dataflowr/slides
+    DATAFLOWR_QUIZ_PATH      → path to cloned dataflowr/quiz
+    DATAFLOWR_FLASH_PATH     → path to cloned dataflowr/gpu_llm_flash-attention
+    DATAFLOWR_LLM_GEN_PATH   → path to cloned dataflowr/llm_controlled-generation
+    DATAFLOWR_NOTEBOOKS_PATH → path to cloned dataflowr/notebooks
+
+Example (VM deployment with all repos cloned under /opt/dataflowr/repos):
+    export DATAFLOWR_WEBSITE_PATH=/opt/dataflowr/repos/website
+    export DATAFLOWR_SLIDES_PATH=/opt/dataflowr/repos/slides
+    export DATAFLOWR_QUIZ_PATH=/opt/dataflowr/repos/quiz
+    export DATAFLOWR_FLASH_PATH=/opt/dataflowr/repos/gpu_llm_flash-attention
+    export DATAFLOWR_LLM_GEN_PATH=/opt/dataflowr/repos/llm_controlled-generation
+    export DATAFLOWR_NOTEBOOKS_PATH=/opt/dataflowr/repos/notebooks
 """
 
 import functools
 import json
+import os
 import re
 import urllib.error
 import urllib.request
 from html.parser import HTMLParser
+from pathlib import Path
 
 WEBSITE_REPO = "dataflowr/website"
 _GITHUB_API = f"https://api.github.com/repos/{WEBSITE_REPO}/contents"
@@ -17,10 +41,64 @@ _GITHUB_API = f"https://api.github.com/repos/{WEBSITE_REPO}/contents"
 SLIDES_REPO = "dataflowr/slides"
 _SLIDES_GITHUB_API = f"https://api.github.com/repos/{SLIDES_REPO}/contents"
 
+# ── Local repo path registry ────────────────────────────────────────────────
+# Maps "owner/repo" → local Path, populated from environment variables at
+# import time. Any repo not present falls back to GitHub network access.
+
+_REPO_PATHS: dict[str, Path] = {
+    repo: Path(path)
+    for repo, path in {
+        "dataflowr/website":                   os.environ.get("DATAFLOWR_WEBSITE_PATH"),
+        "dataflowr/slides":                    os.environ.get("DATAFLOWR_SLIDES_PATH"),
+        "dataflowr/quiz":                      os.environ.get("DATAFLOWR_QUIZ_PATH"),
+        "dataflowr/gpu_llm_flash-attention":   os.environ.get("DATAFLOWR_FLASH_PATH"),
+        "dataflowr/llm_controlled-generation": os.environ.get("DATAFLOWR_LLM_GEN_PATH"),
+        "dataflowr/notebooks":                 os.environ.get("DATAFLOWR_NOTEBOOKS_PATH"),
+    }.items()
+    if path is not None
+}
+
+
+def _read_local(repo: str, file_path: str) -> str | None:
+    """Read a file from a local repo clone. Returns None if unavailable."""
+    local = _REPO_PATHS.get(repo)
+    if local is None:
+        return None
+    full = local / file_path
+    try:
+        return full.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+
+def _raw_url_to_local(raw_url: str) -> str | None:
+    """Try to serve a raw.githubusercontent.com URL from a local clone.
+
+    Parses https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
+    and returns the local file contents when a clone is configured.
+    Returns None if no local clone is available or the file is missing.
+    """
+    prefix = "https://raw.githubusercontent.com/"
+    if not raw_url.startswith(prefix):
+        return None
+    rest = raw_url[len(prefix):]
+    parts = rest.split("/", 3)
+    if len(parts) < 4:
+        return None
+    owner, repo, _, path = parts
+    path = path.split("?")[0]  # strip query string if present
+    return _read_local(f"{owner}/{repo}", path)
+
+
+# ── Notebook content ─────────────────────────────────────────────────────────
+
 
 @functools.lru_cache(maxsize=256)
 def fetch_notebook_content(raw_url: str, include_code: bool = True) -> str:
     """Fetch a .ipynb or .md from its raw GitHub URL and return readable text.
+
+    Checks local repo clones first (via DATAFLOWR_*_PATH env vars) before
+    making a network request.
 
     Args:
         raw_url: Raw GitHub URL (e.g. raw.githubusercontent.com/...)
@@ -30,12 +108,16 @@ def fetch_notebook_content(raw_url: str, include_code: bool = True) -> str:
         Markdown text. For .md files, returns the file as-is.
         For .ipynb files, returns markdown + (optionally) code cells joined by blank lines.
     """
-    req = urllib.request.Request(raw_url, headers={"User-Agent": "dataflowr-mcp/0.1"})
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            content = resp.read()
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"Failed to fetch {raw_url}: {e.reason}") from e
+    local = _raw_url_to_local(raw_url)
+    if local is not None:
+        content = local.encode("utf-8")
+    else:
+        req = urllib.request.Request(raw_url, headers={"User-Agent": "dataflowr-mcp/0.1"})
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                content = resp.read()
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"Failed to fetch {raw_url}: {e.reason}") from e
 
     # Plain markdown file — return as-is
     if raw_url.split("?")[0].endswith(".md"):
@@ -92,6 +174,9 @@ def _is_placeholder_code(source: str) -> bool:
 def fetch_notebook_exercises(raw_url: str) -> str:
     """Fetch only the exercise cells from a Jupyter notebook.
 
+    Checks local repo clones first (via DATAFLOWR_*_PATH env vars) before
+    making a network request.
+
     Returns exercise prompt markdown cells and their immediately following
     placeholder code cells (cells the student needs to fill in).
     Skips all expository text, import cells, and solution code.
@@ -103,12 +188,16 @@ def fetch_notebook_exercises(raw_url: str) -> str:
         Markdown string with exercise prompts and skeleton code blocks,
         or a message if no exercise cells are found.
     """
-    req = urllib.request.Request(raw_url, headers={"User-Agent": "dataflowr-mcp/0.1"})
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            content = resp.read()
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"Failed to fetch {raw_url}: {e.reason}") from e
+    local = _raw_url_to_local(raw_url)
+    if local is not None:
+        content = local.encode("utf-8")
+    else:
+        req = urllib.request.Request(raw_url, headers={"User-Agent": "dataflowr-mcp/0.1"})
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                content = resp.read()
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"Failed to fetch {raw_url}: {e.reason}") from e
 
     nb = json.loads(content.decode("utf-8", errors="replace"))
     cells = nb.get("cells", [])
@@ -150,6 +239,9 @@ def fetch_notebook_exercises(raw_url: str) -> str:
     return "\n\n".join(parts)
 
 
+# ── Module page markdown ─────────────────────────────────────────────────────
+
+
 class _TextExtractor(HTMLParser):
     """Strip HTML tags, skipping script/style/nav/footer/header blocks."""
 
@@ -181,7 +273,11 @@ def fetch_module_markdown(website_url: str) -> str:
     """Fetch module content as markdown.
 
     - For dataflowr.github.io URLs: fetches the raw .md source from dataflowr/website.
-    - For github.com URLs: fetches the README.md from that GitHub repo.
+    - For github.com URLs: fetches README.md from that repo.
+
+    Checks local repo clones first (via DATAFLOWR_*_PATH env vars). For
+    github.com URLs the network fallback uses raw.githubusercontent.com
+    (no GitHub API, no rate limit).
 
     Args:
         website_url: The module's website_url field value.
@@ -190,22 +286,32 @@ def fetch_module_markdown(website_url: str) -> str:
         Markdown text (Franklin syntax stripped for website sources).
     """
     if "github.com/" in website_url:
-        # GitHub repo URL — fetch README.md
         repo_path = website_url.rstrip("/").split("github.com/")[-1]
-        api_url = f"https://api.github.com/repos/{repo_path}/contents/README.md"
-        req = urllib.request.Request(
-            api_url,
-            headers={"User-Agent": "dataflowr/0.1", "Accept": "application/vnd.github.raw+json"},
-        )
+
+        # Try local clone first
+        local = _read_local(repo_path, "README.md")
+        if local is not None:
+            return local
+
+        # Use raw.githubusercontent.com — no GitHub API, no rate limit
+        raw_url = f"https://raw.githubusercontent.com/{repo_path}/main/README.md"
+        req = urllib.request.Request(raw_url, headers={"User-Agent": "dataflowr/0.1"})
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 return resp.read().decode("utf-8", errors="replace")
         except urllib.error.URLError as e:
-            raise RuntimeError(f"Failed to fetch {api_url}: {e.reason}") from e
+            raise RuntimeError(f"Failed to fetch {raw_url}: {e.reason}") from e
 
     # dataflowr.github.io/website URL — fetch module .md from website repo
     slug = website_url.rstrip("/").split("/modules/")[-1]
     path = f"modules/{slug}.md"
+
+    # Try local clone first
+    local = _read_local("dataflowr/website", path)
+    if local is not None:
+        return _clean_franklin(local)
+
+    # Fall back to GitHub API
     api_url = f"{_GITHUB_API}/{path}"
     req = urllib.request.Request(
         api_url,
@@ -243,11 +349,24 @@ def _clean_franklin(text: str) -> str:
 
 @functools.lru_cache(maxsize=1)
 def list_website_modules() -> list[dict]:
-    """List all module source files in the dataflowr/website GitHub repo.
+    """List all module source files in the dataflowr/website repo.
+
+    Uses local clone when DATAFLOWR_WEBSITE_PATH is set, otherwise
+    queries the GitHub API.
 
     Returns:
         List of dicts with 'name' (filename) and 'slug' (module slug).
     """
+    local = _REPO_PATHS.get("dataflowr/website")
+    if local is not None:
+        modules_dir = local / "modules"
+        if modules_dir.is_dir():
+            return [
+                {"name": f.name, "slug": f.stem}
+                for f in sorted(modules_dir.glob("*.md"))
+            ]
+
+    # Fall back to GitHub API
     api_url = f"{_GITHUB_API}/modules"
     req = urllib.request.Request(
         api_url,
@@ -265,9 +384,15 @@ def list_website_modules() -> list[dict]:
     ]
 
 
+# ── Slides ───────────────────────────────────────────────────────────────────
+
+
 @functools.lru_cache(maxsize=128)
 def fetch_slide_content(slides_url: str) -> str:
-    """Fetch slide content from the dataflowr/slides GitHub repo.
+    """Fetch slide content from the dataflowr/slides repo.
+
+    Uses local clone when DATAFLOWR_SLIDES_PATH is set, otherwise
+    queries the GitHub API.
 
     Args:
         slides_url: The module's slides URL (e.g. .../module1.html or .../14-03-dropout.html).
@@ -276,6 +401,12 @@ def fetch_slide_content(slides_url: str) -> str:
         Cleaned markdown text extracted from the Remark.js HTML.
     """
     filename = slides_url.rstrip("/").split("/")[-1]
+
+    local = _read_local("dataflowr/slides", filename)
+    if local is not None:
+        return _clean_remark(local)
+
+    # Fall back to GitHub API
     api_url = f"{_SLIDES_GITHUB_API}/{filename}"
     req = urllib.request.Request(
         api_url,
@@ -317,11 +448,22 @@ def _clean_remark(html: str) -> str:
 
 @functools.lru_cache(maxsize=1)
 def list_slide_files() -> list[dict]:
-    """List all slide HTML files in the dataflowr/slides GitHub repo.
+    """List all slide HTML files in the dataflowr/slides repo.
+
+    Uses local clone when DATAFLOWR_SLIDES_PATH is set, otherwise
+    queries the GitHub API.
 
     Returns:
         List of dicts with 'name' (filename) and 'slug' (name without .html).
     """
+    local = _REPO_PATHS.get("dataflowr/slides")
+    if local is not None and local.is_dir():
+        return [
+            {"name": f.name, "slug": f.stem}
+            for f in sorted(local.glob("*.html"))
+        ]
+
+    # Fall back to GitHub API
     req = urllib.request.Request(
         _SLIDES_GITHUB_API,
         headers={"User-Agent": "dataflowr/0.1", "Accept": "application/vnd.github+json"},
@@ -338,6 +480,9 @@ def list_slide_files() -> list[dict]:
     ]
 
 
+# ── Quiz ─────────────────────────────────────────────────────────────────────
+
+
 QUIZ_REPO = "dataflowr/quiz"
 _QUIZ_GITHUB_API = f"https://api.github.com/repos/{QUIZ_REPO}/contents/dl-quiz/src"
 _QUIZ_RAW_BASE = f"https://raw.githubusercontent.com/{QUIZ_REPO}/main/dl-quiz/src"
@@ -345,7 +490,20 @@ _QUIZ_RAW_BASE = f"https://raw.githubusercontent.com/{QUIZ_REPO}/main/dl-quiz/sr
 
 @functools.lru_cache(maxsize=256)
 def _fetch_quiz_file_raw(filename: str) -> bytes:
-    """Fetch a single quiz TOML file from GitHub (cached)."""
+    """Fetch a single quiz TOML file (cached).
+
+    Uses local clone when DATAFLOWR_QUIZ_PATH is set, otherwise
+    fetches from raw.githubusercontent.com.
+    """
+    local = _REPO_PATHS.get("dataflowr/quiz")
+    if local is not None:
+        file_path = local / "dl-quiz" / "src" / filename
+        try:
+            return file_path.read_bytes()
+        except OSError:
+            pass
+
+    # Fall back to raw GitHub (not rate-limited)
     url = f"{_QUIZ_RAW_BASE}/{filename}"
     req = urllib.request.Request(url, headers={"User-Agent": "dataflowr/0.1"})
     try:
@@ -471,11 +629,24 @@ def fetch_quiz_content(quiz_files: list[str]) -> str:
 
 @functools.lru_cache(maxsize=1)
 def list_quiz_files() -> list[dict]:
-    """List all quiz TOML files in the dataflowr/quiz GitHub repo.
+    """List all quiz TOML files in the dataflowr/quiz repo.
+
+    Uses local clone when DATAFLOWR_QUIZ_PATH is set, otherwise
+    queries the GitHub API.
 
     Returns:
         List of dicts with 'name' (filename) and 'slug' (name without .toml).
     """
+    local = _REPO_PATHS.get("dataflowr/quiz")
+    if local is not None:
+        quiz_dir = local / "dl-quiz" / "src"
+        if quiz_dir.is_dir():
+            return [
+                {"name": f.name, "slug": f.stem}
+                for f in sorted(quiz_dir.glob("*.toml"))
+            ]
+
+    # Fall back to GitHub API
     req = urllib.request.Request(
         _QUIZ_GITHUB_API,
         headers={"User-Agent": "dataflowr/0.1", "Accept": "application/vnd.github+json"},
@@ -490,6 +661,9 @@ def list_quiz_files() -> list[dict]:
         for e in entries
         if e["type"] == "file" and e["name"].endswith(".toml")
     ]
+
+
+# ── Website page content ─────────────────────────────────────────────────────
 
 
 @functools.lru_cache(maxsize=128)
