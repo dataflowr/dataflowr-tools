@@ -20,9 +20,9 @@ def test_root_returns_overview():
     r = client.get("/")
     assert r.status_code == 200
     data = r.json()
-    assert data["num_modules"] == 32
+    assert data["num_modules"] == 34
     assert data["num_sessions"] == 9
-    assert data["num_homeworks"] == 5
+    assert data["num_homeworks"] == 6
     assert "endpoints" in data
 
 
@@ -32,7 +32,7 @@ def test_list_modules_returns_all():
     r = client.get("/modules")
     assert r.status_code == 200
     data = r.json()
-    assert len(data) == 32
+    assert len(data) == 34
 
 
 def test_list_modules_session_filter():
@@ -191,7 +191,7 @@ def test_list_homeworks():
     r = client.get("/homeworks")
     assert r.status_code == 200
     data = r.json()
-    assert len(data) == 5
+    assert len(data) == 6
 
 
 # ── GET /homeworks/{id} ───────────────────────────────────────────────────────

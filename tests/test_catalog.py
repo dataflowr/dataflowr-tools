@@ -20,12 +20,12 @@ def test_all_sessions_1_through_9_present():
 
 
 def test_external_modules_have_no_session():
-    for mid in ("flash", "llm_gen", "graph0"):
+    for mid in ("flash", "llm_gen", "graph0", "kv_cache", "lora"):
         assert COURSE.modules[mid].session is None
 
 
 def test_module_count():
-    assert len(COURSE.modules) == 32
+    assert len(COURSE.modules) == 34
 
 
 def test_no_duplicate_module_ids():
@@ -53,7 +53,7 @@ def test_all_prerequisites_exist():
 
 
 def test_homework_count():
-    assert len(COURSE.homeworks) == 5
+    assert len(COURSE.homeworks) == 6
 
 
 def test_all_homework_ids_unique():

@@ -25,18 +25,18 @@ def test_info_shows_title():
 
 def test_info_shows_counts():
     result = runner.invoke(app, ["info"])
-    assert "32" in result.output   # modules
+    assert "34" in result.output   # modules
     assert "9" in result.output    # sessions
-    assert "5" in result.output    # homeworks
+    assert "6" in result.output    # homeworks
 
 
 def test_info_json():
     result = runner.invoke(app, ["info", "--json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["num_modules"] == 32
+    assert data["num_modules"] == 34
     assert data["num_sessions"] == 9
-    assert data["num_homeworks"] == 5
+    assert data["num_homeworks"] == 6
 
 
 # ── modules list ─────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ def test_modules_list_json_is_valid():
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert isinstance(data, list)
-    assert len(data) == 32
+    assert len(data) == 34
     assert all("id" in m for m in data)
 
 

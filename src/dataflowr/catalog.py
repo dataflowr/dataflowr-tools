@@ -18,6 +18,9 @@ QUIZ_GITHUB = "https://github.com/dataflowr/quiz"
 
 LLM_GEN_GITHUB = "https://github.com/dataflowr/llm_controlled-generation"
 
+LLM_EFF_GITHUB = "https://github.com/dataflowr/llm_efficiency"
+LLM_EFF_COLAB  = "https://colab.research.google.com/github/dataflowr/llm_efficiency/blob/main"
+
 
 def _nb(filename: str, title: str, kind: NotebookKind = NotebookKind.practical,
         colab: bool = True, gpu: bool = False) -> Notebook:
@@ -53,6 +56,20 @@ def _llm_gen_nb(path: str, title: str, kind: NotebookKind = NotebookKind.practic
         github_url=f"{LLM_GEN_GITHUB}/blob/main/{path}",
         colab_url=None,
         requires_gpu=False,
+    )
+
+
+def _llm_eff_nb(path: str, title: str, kind: NotebookKind = NotebookKind.practical,
+                gpu: bool = True) -> Notebook:
+    """Notebook entry for the llm_efficiency repo."""
+    is_ipynb = path.endswith(".ipynb")
+    return Notebook(
+        filename=path.split("/")[-1],
+        title=title,
+        kind=kind,
+        github_url=f"{LLM_EFF_GITHUB}/blob/main/{path}",
+        colab_url=f"{LLM_EFF_COLAB}/{path}" if is_ipynb else None,
+        requires_gpu=gpu,
     )
 
 
@@ -590,6 +607,40 @@ MODULES: dict[str, Module] = {
         ],
     ),
 
+    "kv_cache": Module(
+        id="kv_cache",
+        title="KV Cache for Efficient LLM Inference",
+        description="Implement KV caching for transformer inference to avoid redundant "
+                    "key/value recomputation. Benchmark the speedup on a minGPT model.",
+        prerequisites=["12"],
+        website_url=LLM_EFF_GITHUB,
+        tags=["KV cache", "inference", "minGPT", "optimization", "LLM", "transformer"],
+        requires_gpu=True,
+        notebooks=[
+            _llm_eff_nb("kv_cache/kv_cache.md",
+                        "KV Cache: Concept and API", kind=NotebookKind.intro, gpu=False),
+            _llm_eff_nb("practicals/KV_cache_empty.ipynb",
+                        "KV Cache Implementation (empty)"),
+        ],
+    ),
+
+    "lora": Module(
+        id="lora",
+        title="LoRA: Low-Rank Adaptation for LLMs",
+        description="Implement LoRA (Low-Rank Adaptation) for parameter-efficient fine-tuning. "
+                    "Apply it to a minGPT sorting task.",
+        prerequisites=["12"],
+        website_url=LLM_EFF_GITHUB,
+        tags=["LoRA", "fine-tuning", "parameter-efficient", "minGPT", "LLM", "low-rank"],
+        requires_gpu=True,
+        notebooks=[
+            _llm_eff_nb("lora/lora.md",
+                        "LoRA: Concept and API", kind=NotebookKind.intro, gpu=False),
+            _llm_eff_nb("practicals/Lora_empty.ipynb",
+                        "LoRA Fine-Tuning (empty)"),
+        ],
+    ),
+
     "graph0": Module(
         id="graph0",
         title="Deep Learning on Graphs",
@@ -776,6 +827,21 @@ HOMEWORKS: list[Homework] = [
                         "Part 2: Meta-Generation", kind=NotebookKind.homework),
             _llm_gen_nb("self_correction/self_correction.md",
                         "Part 3: Self-Correction", kind=NotebookKind.homework),
+        ],
+    ),
+
+    Homework(
+        id=6,
+        title="LLM Efficiency: KV Cache and LoRA",
+        description="Two-part lab on LLM efficiency: implement KV caching for fast "
+                    "inference and LoRA for parameter-efficient fine-tuning, both "
+                    "built on top of minGPT.",
+        website_url=LLM_EFF_GITHUB,
+        notebooks=[
+            _llm_eff_nb("practicals/KV_cache_empty.ipynb",
+                        "Part 1: KV Cache Implementation", kind=NotebookKind.homework),
+            _llm_eff_nb("practicals/Lora_empty.ipynb",
+                        "Part 2: LoRA Fine-Tuning", kind=NotebookKind.homework),
         ],
     ),
 ]

@@ -15,6 +15,7 @@ the network automatically.
     DATAFLOWR_QUIZ_PATH      → path to cloned dataflowr/quiz
     DATAFLOWR_FLASH_PATH     → path to cloned dataflowr/gpu_llm_flash-attention
     DATAFLOWR_LLM_GEN_PATH   → path to cloned dataflowr/llm_controlled-generation
+    DATAFLOWR_LLM_EFF_PATH   → path to cloned dataflowr/llm_efficiency
     DATAFLOWR_NOTEBOOKS_PATH → path to cloned dataflowr/notebooks
 
 Example (VM deployment with all repos cloned under /opt/dataflowr/repos):
@@ -53,6 +54,7 @@ _REPO_PATHS: dict[str, Path] = {
         "dataflowr/quiz":                      os.environ.get("DATAFLOWR_QUIZ_PATH"),
         "dataflowr/gpu_llm_flash-attention":   os.environ.get("DATAFLOWR_FLASH_PATH"),
         "dataflowr/llm_controlled-generation": os.environ.get("DATAFLOWR_LLM_GEN_PATH"),
+        "dataflowr/llm_efficiency":            os.environ.get("DATAFLOWR_LLM_EFF_PATH"),
         "dataflowr/notebooks":                 os.environ.get("DATAFLOWR_NOTEBOOKS_PATH"),
     }.items()
     if path is not None
