@@ -8,6 +8,7 @@ The [Deep Learning DIY](https://dataflowr.github.io/website) course teaches PyTo
 - [dataflowr/notebooks](https://github.com/dataflowr/notebooks) — all practical notebooks (PyTorch fundamentals → diffusion models)
 - [dataflowr/gpu_llm_flash-attention](https://github.com/dataflowr/gpu_llm_flash-attention) — implement FlashAttention-2 from scratch using Triton
 - [dataflowr/llm_controlled-generation](https://github.com/dataflowr/llm_controlled-generation) — structured generation, meta-generation, and self-correction for LLMs
+- [dataflowr/llm_efficiency](https://github.com/dataflowr/llm_efficiency) - KV Cache and LoRA for minGPT
 
 This package exposes the course as a CLI, REST API, and MCP server so AI agents can navigate and teach it.
 
