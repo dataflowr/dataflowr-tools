@@ -23,6 +23,7 @@ This package exposes the course as a CLI, REST API, and MCP server so AI agents 
 {
   "mcpServers": {
     "dataflowr": {
+      "type": "http",
       "url": "https://dataflowr.paris.inria.fr/mcp"
     }
   }
@@ -306,6 +307,7 @@ If running your own instance with `--http`, point clients at the URL:
 {
   "mcpServers": {
     "dataflowr": {
+      "type": "http",
       "url": "http://localhost:8001/mcp"
     }
   }
