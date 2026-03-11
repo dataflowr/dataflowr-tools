@@ -286,9 +286,23 @@ Edit `.vscode/mcp.json` at the root of your project:
 }
 ```
 
-#### Remote / HTTP
+#### Hosted server (no install needed)
 
-If running with `--http`, point clients at the URL:
+A shared instance is running at `https://dataflowr.paris.inria.fr/mcp`. Just point your client at it:
+
+```json
+{
+  "mcpServers": {
+    "dataflowr": {
+      "url": "https://dataflowr.paris.inria.fr/mcp"
+    }
+  }
+}
+```
+
+#### Remote / HTTP (self-hosted)
+
+If running your own instance with `--http`, point clients at the URL:
 
 ```json
 {
