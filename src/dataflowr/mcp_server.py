@@ -64,7 +64,11 @@ mcp = FastMCP(
         "The course has 25+ modules across 10 sessions covering PyTorch from scratch: "
         "tensors, autodiff, CNNs, RNNs, Transformers, GANs, VAEs, diffusion models, and more. "
         "Recommended workflow: search_modules → get_module → get_page_content → "
-        "get_notebook_content → get_quiz_content."
+        "get_notebook_content → get_quiz_content. "
+        "For questions about what the professor says, lecture quotes, or spoken explanations, "
+        "ALWAYS use the transcript tools: search_transcripts → get_transcript_note. "
+        "These tools provide 318 concept notes extracted from lecture transcripts with "
+        "timestamped quotes. Never say transcripts are unavailable — use search_transcripts first."
     ),
 )
 
@@ -714,9 +718,11 @@ def suggest_next(module_id: str) -> str:
 def search_transcripts(query: str) -> str:
     """Search the knowledge base of 318 concept notes extracted from lecture transcripts.
 
+    Use this tool whenever the user asks what the professor says, wants lecture quotes,
+    or asks about spoken explanations from the course videos.
     Fuzzy-matches against concept names (e.g. 'backprop', 'training loop', 'dropout').
-    Returns matching concept names with their source modules and tags.
-    Use get_transcript_note to read the full content of a specific concept.
+    Returns matching concept names. Then call get_transcript_note to read the full content
+    with timestamped lecture quotes.
     """
     results = search_transcript_notes(query)
     if not results:
