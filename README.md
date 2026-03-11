@@ -56,6 +56,8 @@ To pre-approve all dataflowr tools (no per-call prompts), also add `.claude/sett
 }
 ```
 
+For a global allow (all projects), add the same to `~/.claude/settings.json`.
+
 ---
 
 ## Install
