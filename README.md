@@ -17,7 +17,19 @@ This package exposes the course as a CLI, REST API, and MCP server so AI agents 
 
 ## Quick start with Claude Code
 
-Add a `.mcp.json` file at the root of your project (homework repo, notebook folder, etc.):
+**Option 1 — Hosted server (no install needed):** add a `.mcp.json` file at the root of your project pointing to the shared instance:
+
+```json
+{
+  "mcpServers": {
+    "dataflowr": {
+      "url": "https://dataflowr.paris.inria.fr/mcp"
+    }
+  }
+}
+```
+
+**Option 2 — Local server:** run it yourself with `uv` (downloads on first use):
 
 ```json
 {
@@ -31,7 +43,7 @@ Add a `.mcp.json` file at the root of your project (homework repo, notebook fold
 }
 ```
 
-Claude Code picks this up automatically when you open the folder. No global install needed — `uv` downloads `dataflowr[mcp]` on first use.
+Claude Code picks this up automatically when you open the folder.
 
 To pre-approve all dataflowr tools (no per-call prompts), also add `.claude/settings.json`:
 
@@ -281,20 +293,6 @@ Edit `.vscode/mcp.json` at the root of your project:
       "type": "stdio",
       "command": "python",
       "args": ["-m", "dataflowr.mcp_server"]
-    }
-  }
-}
-```
-
-#### Hosted server (no install needed)
-
-A shared instance is running at `https://dataflowr.paris.inria.fr/mcp`. Just point your client at it:
-
-```json
-{
-  "mcpServers": {
-    "dataflowr": {
-      "url": "https://dataflowr.paris.inria.fr/mcp"
     }
   }
 }
