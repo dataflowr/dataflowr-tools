@@ -30,6 +30,8 @@ Tools exposed:
     - get_prerequisites     prerequisite modules for a given module
     - check_quiz_answer     validate a student's quiz answer
     - suggest_next          what to study after a given module
+    - search_transcripts    fuzzy search 318 concept notes from lecture transcripts
+    - get_transcript_note   fetch full content of a transcript concept note
 
 Prompts exposed:
     - explain_module        tutoring session for a specific module
@@ -48,9 +50,11 @@ from .content import (
     fetch_notebook_exercises,
     fetch_quiz_content,
     fetch_slide_content,
+    fetch_transcript_note,
     list_quiz_files,
     list_slide_files,
     list_website_modules,
+    search_transcript_notes,
 )
 
 mcp = FastMCP(
@@ -701,6 +705,53 @@ def suggest_next(module_id: str) -> str:
         )
 
     return "\n".join(lines)
+
+
+# ── Transcript knowledge base ─────────────────────────────────────────────
+
+
+@mcp.tool()
+def search_transcripts(query: str) -> str:
+    """Search the knowledge base of 318 concept notes extracted from lecture transcripts.
+
+    Fuzzy-matches against concept names (e.g. 'backprop', 'training loop', 'dropout').
+    Returns matching concept names with their source modules and tags.
+    Use get_transcript_note to read the full content of a specific concept.
+    """
+    results = search_transcript_notes(query)
+    if not results:
+        return (
+            f"No transcript notes found for '{query}'. "
+            f"Try different keywords (e.g. 'gradient', 'convolution', 'loss')."
+        )
+    lines = [f"Found {len(results)} concept note(s) for '{query}':\n"]
+    for note in results:
+        lines.append(f"- **{note['concept']}**")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def get_transcript_note(concept: str) -> str:
+    """Fetch the full content of a concept note from the transcript knowledge base.
+
+    Returns the note with concept summary, timestamped lecture quotes, and cross-references.
+    Use search_transcripts first to find the exact concept name.
+    concept: the concept name, e.g. 'training loop', 'backpropagation', 'dropout'
+    """
+    try:
+        return fetch_transcript_note(concept)
+    except RuntimeError:
+        results = search_transcript_notes(concept)
+        if results:
+            suggestions = [r["concept"] for r in results[:5]]
+            return (
+                f"Concept '{concept}' not found. Did you mean: {', '.join(suggestions)}? "
+                f"Use search_transcripts to find the exact name."
+            )
+        return (
+            f"Concept '{concept}' not found. "
+            f"Use search_transcripts to find available concepts."
+        )
 
 
 # ── Prompts ────────────────────────────────────────────────────────────────

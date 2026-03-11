@@ -25,7 +25,8 @@ from .catalog import COURSE
 from .content import (fetch_notebook_content, fetch_module_markdown, list_website_modules,
                        fetch_slide_content, list_slide_files,
                        fetch_quiz_content, list_quiz_files,
-                       parse_quiz_questions, check_quiz_answer)
+                       parse_quiz_questions, check_quiz_answer,
+                       search_transcript_notes, fetch_transcript_note)
 
 app = typer.Typer(
     name="dataflowr",
@@ -390,6 +391,52 @@ def quiz(
         console.print(
             f"[dim]Review the module at: [link={module.website_url}]{module.website_url}[/link][/dim]"
         )
+
+
+# ── Transcripts ────────────────────────────────────────────────────────────
+
+transcripts_app = typer.Typer(help="Browse transcript knowledge base", no_args_is_help=True)
+app.add_typer(transcripts_app, name="transcripts")
+
+
+@transcripts_app.command("search")
+def transcripts_search(
+    query: str = typer.Argument(help="Search query (e.g. 'backprop', 'training loop')"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Search the transcript knowledge base by concept name."""
+    results = search_transcript_notes(query)
+
+    if not results:
+        rprint(f"[yellow]No concept notes found for '{query}'.[/yellow]")
+        rprint("[dim]Try different keywords (e.g. 'gradient', 'convolution', 'loss').[/dim]")
+        raise typer.Exit(0)
+
+    if json_output:
+        typer.echo(json.dumps(results, indent=2))
+        return
+
+    rprint(f"\nFound [bold]{len(results)}[/bold] concept note(s) for '[cyan]{query}[/cyan]':\n")
+    for note in results:
+        rprint(f"  [cyan bold]{note['concept']}[/cyan bold]")
+
+
+@transcripts_app.command("get")
+def transcripts_get(
+    concept: str = typer.Argument(help="Concept name (e.g. 'training loop', 'dropout')"),
+):
+    """Fetch and display a concept note from the transcript knowledge base."""
+    try:
+        content = fetch_transcript_note(concept)
+        console.print(content)
+    except RuntimeError:
+        results = search_transcript_notes(concept)
+        rprint(f"[red]Concept '{concept}' not found.[/red]")
+        if results:
+            suggestions = [r["concept"] for r in results[:5]]
+            rprint(f"[yellow]Did you mean: {', '.join(suggestions)}?[/yellow]")
+        rprint("[dim]Use [bold]dataflowr transcripts search <query>[/bold] to find concepts.[/dim]")
+        raise typer.Exit(1)
 
 
 # ── Search ─────────────────────────────────────────────────────────────────

@@ -17,6 +17,9 @@ from dataflowr.content import (
     _is_placeholder_code,
     fetch_notebook_content,
     fetch_notebook_exercises,
+    fetch_transcript_note,
+    list_transcript_notes,
+    search_transcript_notes,
 )
 
 
@@ -261,3 +264,82 @@ def test_fetch_notebook_exercises_empty_notebook():
     with _mock_urlopen(_make_notebook_bytes([])):
         result = fetch_notebook_exercises.__wrapped__(raw_url)
     assert "No exercise cells found" in result
+
+
+# ── Transcript knowledge base ────────────────────────────────────────────────
+
+
+def test_list_transcript_notes_local(tmp_path):
+    kb_dir = tmp_path / "knowledge_base"
+    kb_dir.mkdir()
+    (kb_dir / "dropout.md").write_text("# Dropout")
+    (kb_dir / "backpropagation.md").write_text("# Backpropagation")
+
+    with mock.patch.dict(
+        "dataflowr.content._REPO_PATHS",
+        {"dataflowr/transcripts": tmp_path},
+    ):
+        result = list_transcript_notes.__wrapped__()
+    concepts = [r["concept"] for r in result]
+    assert "dropout" in concepts
+    assert "backpropagation" in concepts
+    assert all(r["name"].endswith(".md") for r in result)
+
+
+def test_fetch_transcript_note_local(tmp_path):
+    kb_dir = tmp_path / "knowledge_base"
+    kb_dir.mkdir()
+    (kb_dir / "training loop.md").write_text("# Training Loop\nContent here.")
+
+    with mock.patch.dict(
+        "dataflowr.content._REPO_PATHS",
+        {"dataflowr/transcripts": tmp_path},
+    ):
+        result = fetch_transcript_note.__wrapped__("training loop")
+    assert "Training Loop" in result
+    assert "Content here." in result
+
+
+def test_search_transcript_notes_substring_match():
+    notes = [
+        {"name": "backpropagation.md", "concept": "backpropagation"},
+        {"name": "backpropagation through time.md", "concept": "backpropagation through time"},
+        {"name": "dropout.md", "concept": "dropout"},
+        {"name": "backward pass.md", "concept": "backward pass"},
+    ]
+    with mock.patch("dataflowr.content.list_transcript_notes", return_value=notes):
+        results = search_transcript_notes("backprop")
+    concepts = [r["concept"] for r in results]
+    assert "backpropagation" in concepts
+    assert "backpropagation through time" in concepts
+    assert "dropout" not in concepts
+
+
+def test_search_transcript_notes_exact_match_first():
+    notes = [
+        {"name": "dropout.md", "concept": "dropout"},
+        {"name": "dropblock.md", "concept": "dropblock"},
+    ]
+    with mock.patch("dataflowr.content.list_transcript_notes", return_value=notes):
+        results = search_transcript_notes("dropout")
+    assert results[0]["concept"] == "dropout"
+
+
+def test_search_transcript_notes_no_match():
+    notes = [
+        {"name": "dropout.md", "concept": "dropout"},
+    ]
+    with mock.patch("dataflowr.content.list_transcript_notes", return_value=notes):
+        results = search_transcript_notes("xyznonexistent")
+    assert results == []
+
+
+def test_search_transcript_notes_multi_word():
+    notes = [
+        {"name": "training loop.md", "concept": "training loop"},
+        {"name": "training.md", "concept": "training"},
+        {"name": "loop.md", "concept": "loop"},
+    ]
+    with mock.patch("dataflowr.content.list_transcript_notes", return_value=notes):
+        results = search_transcript_notes("training loop")
+    assert results[0]["concept"] == "training loop"

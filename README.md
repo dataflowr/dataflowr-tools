@@ -9,6 +9,7 @@ The [Deep Learning DIY](https://dataflowr.github.io/website) course teaches PyTo
 - [dataflowr/gpu_llm_flash-attention](https://github.com/dataflowr/gpu_llm_flash-attention) — implement FlashAttention-2 from scratch using Triton
 - [dataflowr/llm_controlled-generation](https://github.com/dataflowr/llm_controlled-generation) — structured generation, meta-generation, and self-correction for LLMs
 - [dataflowr/llm_efficiency](https://github.com/dataflowr/llm_efficiency) - KV Cache and LoRA for minGPT
+- [dataflowr/transcripts](https://github.com/dataflowr/transcripts) — 318 concept notes extracted from lecture transcripts, with timestamped quotes and cross-references
 
 This package exposes the course as a CLI, REST API, and MCP server so AI agents can navigate and teach it.
 
@@ -99,6 +100,10 @@ dataflowr slides 12
 dataflowr quiz 2a
 dataflowr quiz 3
 
+# Browse transcript knowledge base (318 concept notes from lectures)
+dataflowr transcripts search "backprop"
+dataflowr transcripts get "training loop"
+
 # Compare catalog against website + slides repos
 dataflowr sync
 
@@ -147,6 +152,8 @@ Endpoints:
 | GET | `/homeworks` | List all homeworks |
 | GET | `/homeworks/{id}` | Get homework by ID |
 | GET | `/search?q=...` | Search modules |
+| GET | `/transcripts/search?q=...` | Search transcript concept notes |
+| GET | `/transcripts/{concept}` | Get a transcript concept note |
 
 Examples:
 ```bash
@@ -159,6 +166,8 @@ curl "http://localhost:8000/modules/12/notebooks/practical/content?include_code=
 curl http://localhost:8000/modules/12/page
 curl http://localhost:8000/modules/2a/quiz
 curl http://localhost:8000/modules/3/quiz
+curl "http://localhost:8000/transcripts/search?q=backprop"
+curl http://localhost:8000/transcripts/training%20loop
 ```
 
 ---
@@ -301,6 +310,8 @@ If running with `--http`, point clients at the URL:
 3. get_page_content "12"           → read the lecture notes
 4. get_notebook_content "12"       → work through the exercises
 5. get_quiz_content "12"           → self-test your understanding
+6. search_transcripts "attention"  → find concept notes from lecture transcripts
+7. get_transcript_note "training loop" → read timestamped quotes and cross-references
 ```
 
 For a personalised study plan, use the **`learning_path`** prompt with a target module.
@@ -329,6 +340,8 @@ For a personalised study plan, use the **`learning_path`** prompt with a target 
 | `get_prerequisites` | Prerequisite modules for a given module |
 | `suggest_next` | What to study after completing a module |
 | `sync_catalog` | Compare catalog against website + slides repos |
+| `search_transcripts` | Fuzzy search 318 concept notes from lecture transcripts |
+| `get_transcript_note` | Fetch full content of a transcript concept note |
 
 ### Prompts exposed to the agent
 
@@ -353,6 +366,7 @@ Once connected, an agent can answer questions like:
 - *"Quiz me on Module 3 — loss functions."*
 - *"I'm stuck on the backprop exercise in Module 2b. Help me debug it."*
 - *"Build me a learning path to Module 18b (diffusion models) starting from scratch."*
+- *"What does the professor say about the training loop? Show me the transcript quotes."*
 
 ---
 

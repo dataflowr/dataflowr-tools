@@ -13,6 +13,8 @@ Endpoints:
     GET /sessions/{n}            get session with its modules
     GET /homeworks               list all homeworks
     GET /search?q=...            search modules
+    GET /transcripts/search?q=.. search transcript concept notes
+    GET /transcripts/{concept}   get a transcript concept note
 """
 
 from fastapi import FastAPI, HTTPException, Query
@@ -24,7 +26,8 @@ from .catalog import COURSE
 from .content import (fetch_notebook_content, fetch_module_markdown, list_website_modules,
                        fetch_slide_content, list_slide_files,
                        fetch_quiz_content, list_quiz_files,
-                       parse_quiz_questions, check_quiz_answer)
+                       parse_quiz_questions, check_quiz_answer,
+                       search_transcript_notes, fetch_transcript_note)
 from .models import Module, Session, Homework
 
 app = FastAPI(
@@ -54,7 +57,9 @@ def root():
             "search":         "/search?q=<query>",
             "quiz_questions": "/modules/{id}/quiz/questions",
             "quiz_check":     "POST /modules/{id}/quiz/check",
-            "docs":           "/docs",
+            "transcripts_search": "/transcripts/search?q=<query>",
+            "transcript_note":   "/transcripts/{concept}",
+            "docs":              "/docs",
         },
     }
 
@@ -277,6 +282,36 @@ def search(q: str = Query(..., description="Search query")):
         "count": len(results),
         "results": [_module_summary(m) for m in results],
     }
+
+
+# ── Transcripts ────────────────────────────────────────────────────────────
+
+@app.get("/transcripts/search", summary="Search transcript concept notes")
+def search_transcripts(q: str = Query(..., description="Search query (e.g. 'backprop', 'training loop')")):
+    """Search the transcript knowledge base by concept name."""
+    results = search_transcript_notes(q)
+    return {
+        "query": q,
+        "count": len(results),
+        "results": results,
+    }
+
+
+@app.get("/transcripts/{concept}", summary="Get a transcript concept note",
+         response_class=PlainTextResponse)
+def get_transcript(concept: str):
+    """Fetch the full content of a concept note from the transcript knowledge base."""
+    try:
+        return fetch_transcript_note(concept)
+    except RuntimeError:
+        results = search_transcript_notes(concept)
+        suggestions = [r["concept"] for r in results[:5]] if results else []
+        hint = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
+        raise HTTPException(
+            status_code=404,
+            detail=f"Concept '{concept}' not found.{hint} "
+                   f"Use GET /transcripts/search?q=<query> to find concepts.",
+        )
 
 
 # ── Catalog sync ───────────────────────────────────────────────────────────

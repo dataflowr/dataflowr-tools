@@ -42,6 +42,10 @@ _GITHUB_API = f"https://api.github.com/repos/{WEBSITE_REPO}/contents"
 SLIDES_REPO = "dataflowr/slides"
 _SLIDES_GITHUB_API = f"https://api.github.com/repos/{SLIDES_REPO}/contents"
 
+TRANSCRIPTS_REPO = "dataflowr/transcripts"
+_TRANSCRIPTS_GITHUB_API = f"https://api.github.com/repos/{TRANSCRIPTS_REPO}/contents/knowledge_base"
+_TRANSCRIPTS_RAW_BASE = f"https://raw.githubusercontent.com/{TRANSCRIPTS_REPO}/main/knowledge_base"
+
 # ── Local repo path registry ────────────────────────────────────────────────
 # Maps "owner/repo" → local Path, populated from environment variables at
 # import time. Any repo not present falls back to GitHub network access.
@@ -56,6 +60,7 @@ _REPO_PATHS: dict[str, Path] = {
         "dataflowr/llm_controlled-generation": os.environ.get("DATAFLOWR_LLM_GEN_PATH"),
         "dataflowr/llm_efficiency":            os.environ.get("DATAFLOWR_LLM_EFF_PATH"),
         "dataflowr/notebooks":                 os.environ.get("DATAFLOWR_NOTEBOOKS_PATH"),
+        "dataflowr/transcripts":               os.environ.get("DATAFLOWR_TRANSCRIPTS_PATH"),
     }.items()
     if path is not None
 }
@@ -688,3 +693,103 @@ def fetch_page_content(url: str) -> str:
     parser = _TextExtractor()
     parser.feed(html)
     return parser.get_text()
+
+
+# ── Transcripts knowledge base ────────────────────────────────────────────────
+
+
+@functools.lru_cache(maxsize=1)
+def list_transcript_notes() -> list[dict]:
+    """List all concept notes in the dataflowr/transcripts knowledge base.
+
+    Uses local clone when DATAFLOWR_TRANSCRIPTS_PATH is set, otherwise
+    queries the GitHub API.
+
+    Returns:
+        List of dicts with 'name' (filename) and 'concept' (name without .md).
+    """
+    local = _REPO_PATHS.get("dataflowr/transcripts")
+    if local is not None:
+        kb_dir = local / "knowledge_base"
+        if kb_dir.is_dir():
+            return [
+                {"name": f.name, "concept": f.stem}
+                for f in sorted(kb_dir.glob("*.md"))
+            ]
+
+    # Fall back to GitHub API
+    req = urllib.request.Request(
+        _TRANSCRIPTS_GITHUB_API,
+        headers={"User-Agent": "dataflowr/0.1", "Accept": "application/vnd.github+json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            entries = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Failed to fetch transcript notes list: {e.reason}") from e
+    return [
+        {"name": e["name"], "concept": e["name"].removesuffix(".md")}
+        for e in entries
+        if e["type"] == "file" and e["name"].endswith(".md")
+    ]
+
+
+@functools.lru_cache(maxsize=256)
+def fetch_transcript_note(concept: str) -> str:
+    """Fetch a single concept note from the transcript knowledge base.
+
+    Args:
+        concept: The concept name (e.g. 'training loop', 'backpropagation').
+
+    Returns:
+        The full markdown content of the note.
+    """
+    filename = f"{concept}.md"
+
+    local = _read_local("dataflowr/transcripts", f"knowledge_base/{filename}")
+    if local is not None:
+        return local
+
+    # Fall back to raw GitHub (not rate-limited)
+    url = f"{_TRANSCRIPTS_RAW_BASE}/{urllib.request.quote(filename)}"
+    req = urllib.request.Request(url, headers={"User-Agent": "dataflowr/0.1"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Failed to fetch transcript note '{concept}': {e.reason}") from e
+
+
+def search_transcript_notes(query: str) -> list[dict]:
+    """Search concept notes by fuzzy-matching against concept names.
+
+    Matches are ranked: exact match first, then starts-with, then contains,
+    then word-boundary partial matches.
+
+    Args:
+        query: Search string (e.g. 'backprop', 'training', 'dropout').
+
+    Returns:
+        List of matching dicts with 'name' and 'concept' keys, sorted by relevance.
+    """
+    notes = list_transcript_notes()
+    query_lower = query.lower()
+    query_words = query_lower.split()
+
+    exact = []
+    starts_with = []
+    contains = []
+    word_match = []
+
+    for note in notes:
+        concept = note["concept"].lower()
+        if concept == query_lower:
+            exact.append(note)
+        elif concept.startswith(query_lower):
+            starts_with.append(note)
+        elif query_lower in concept:
+            contains.append(note)
+        elif all(w in concept for w in query_words):
+            word_match.append(note)
+
+    return exact + starts_with + contains + word_match
