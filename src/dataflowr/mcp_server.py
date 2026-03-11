@@ -865,8 +865,9 @@ def run_mcp_server():
     import os
     import sys
     if "--http" in sys.argv:
+        import uvicorn
         port = int(os.environ.get("PORT", 8001))
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
+        uvicorn.run(mcp.streamable_http_app(), host="0.0.0.0", port=port)
     else:
         mcp.run()  # stdio
 
